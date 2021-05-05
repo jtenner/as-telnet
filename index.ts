@@ -29,6 +29,15 @@ export class telnet_environ_t {
 	) {}
 }
 
+export class telnet_mssp_t {
+	public constructor(
+		/*!< name of the variable being set */
+		public key: string,
+		/*!< value of variable being set */
+		public value: string,
+	) {}
+}
+
 export class telnet_event_data_t extends telnet_event_t {
 	constructor(
 		public data: StaticArray<u8>,
@@ -39,7 +48,7 @@ export class telnet_event_data_t extends telnet_event_t {
 
 export class telnet_event_mssp_t extends telnet_event_t {
 	constructor(
-		public values: StaticArray<telnet_environ_t> | null,
+		public values: Array<telnet_mssp_t> | null,
 	) {
 		super(telnet_event_type_t.TELNET_EV_MSSP);
 	}
@@ -260,18 +269,6 @@ function scan_until_next_environ_var(buffer: StaticArray<u8>, i: i32): i32 {
 		}
 		if (c == TELNET_ENVIRON_ESC) i++;
 		i++;
-	}
-	return i;
-}
-
-function scan_until_next_mssp_var(buffer: StaticArray<u8>, i: i32): i32 {
-	let length = buffer.length;
-	while (i < length) {
-		let c = unchecked(buffer[i]);
-		if (c == TELNET_MSSP_VAR ||
-			c == TELNET_MSSP_VAL) {
-				break;
-			}
 	}
 	return i;
 }
@@ -647,57 +644,64 @@ export class telnet_t<T> {
 		// char *c, *last, *out;
 		// size_t i, count;
 		// unsigned char next_type;
-		let count: i32;
-		let i: i32;
-		let index: i32;
 
-		/* if we have no data, just pass it through */
-		if (size == 0) {
-			return 0;
-		}
-
-		/* first byte must be a VAR */
-		if (unchecked(buffer[0]) != TELNET_MSSP_VAR) {
+		let values = new Array<telnet_mssp_t>();
+		let i = 0;
+		let c = unchecked(buffer[i++]);
+		if (c != TELNET_MSSP_VAR) {
 			let onError = this.onError;
 			if (onError) onError(this, telnet_error_t.TELNET_EPROTOCOL, false, "MSSP subnegotiation has invalid data");
 			return 0;
 		}
 
-		/* count the arguments, any part that starts with VALUE */
-		for (count = 0, i = 0; i != size; ++i) {
-			if (unchecked(buffer[i]) == TELNET_MSSP_VAL) {
-				++count;
-			}
-		}
-
-		/* allocate argument array, bail on error */
-		let values = new StaticArray<telnet_environ_t>(count);
-		let ev = new telnet_event_mssp_t(values);
-
-		/* allocate strings in argument array */
-		for (i = 0, index = 0; index < count;) {
-			let msspType = unchecked(buffer[i++]);
-			let strStart = i;
-			let strEnd = scan_until_next_mssp_var(buffer, i);
-			let str = String.UTF8.decodeUnsafe(
-				changetype<usize>(buffer) + <usize>strStart,
-				<usize>(strEnd - strStart),
-				false,
-			);
-
-			if (msspType == TELNET_MSSP_VAR) {
-				unchecked(values[index]).key = str;
-			} else if (msspType == TELNET_MSSP_VAL) {
-				unchecked(values[index]).value = str;
-				index++;
-			} else {
+		let state = TELNET_MSSP_VAR;
+		let key: string = "";
+		let start = 1;
+		for (;i < size; i++) {
+			let c = unchecked(buffer[i]);
+			if (c == state) {
 				let onError = this.onError;
-				if (onError) onError(this, telnet_error_t.TELNET_EPROTOCOL, false, "invalid MSSP subnegotiation data");
+				if (onError) onError(this, telnet_error_t.TELNET_EPROTOCOL, false, "MSSP subnegotiation has invalid data");
 				return 0;
 			}
+
+			if (c == TELNET_MSSP_VAR) {
+				let val = String.UTF8.decodeUnsafe(
+					changetype<usize>(buffer) + <usize>start,
+					i - start,
+					false,
+				);
+				let mssp = new telnet_mssp_t(key, val);
+				start = i + 1;
+				values.push(mssp);
+				state = TELNET_MSSP_VAR;
+			} else if (c == TELNET_MSSP_VAL) {
+				key = String.UTF8.decodeUnsafe(
+					changetype<usize>(buffer) + <usize>start,
+					i - start,
+					false,
+				);
+				state = TELNET_MSSP_VAL;
+				start = i + 1;
+			}
 		}
 
+		if (state == TELNET_MSSP_VAR) {
+			let onError = this.onError;
+			if (onError) onError(this, telnet_error_t.TELNET_EPROTOCOL, false, "MSSP subnegotiation has invalid data");
+			return 0;
+		}
+
+		let val = String.UTF8.decodeUnsafe(
+			changetype<usize>(buffer) + <usize>start,
+			i - start,
+			false,
+		);
+		let mssp = new telnet_mssp_t(key, val);
+		values.push(mssp);
+
 		let onMSSP = this.onMSSP;
+		let ev = new telnet_event_mssp_t(values);
 		if (onMSSP) onMSSP(this, ev);
 		return 0;
 	}

@@ -1,0 +1,11 @@
+SB: %46 
+ERR: %04 -> MSSP subnegotiation has invalid data
+SB: %46 %01FOO%02BAR
+MSSP: %0C
+  FOO = BAR
+SB: %46 %01FOO%02BAR%02BAZ
+ERR: %04 -> MSSP subnegotiation has invalid data
+SB: %46 %01FOO%01BAR%01BAZ
+ERR: %04 -> MSSP subnegotiation has invalid data
+SB: %46 %01FOO%02BAR%01BAZ
+ERR: %04 -> MSSP subnegotiation has invalid data

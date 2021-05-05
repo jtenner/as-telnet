@@ -93,10 +93,10 @@ export function reset(): void {
     out += "MSSP: %" + ev.type.toString(16).toUpperCase().padStart(2, "0") + "\r\n";
     let values = ev.values;
     if (values) {
-      for (let i = 0; values.length; i++) {
+      let size = values.length;
+      for (let i = 0; i < size; i++) {
         let value = unchecked(values[i]);
-        out += "  TYPE: " + value.env_type.toString(16).toUpperCase().padStart(2, "0");
-        out += " " + value.key;
+        out += "  " + value.key;
         let strValue = value.value;
         if (strValue) {
           out += " = " + strValue;
