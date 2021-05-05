@@ -1,0 +1,8 @@
+SB: %18 %01
+TTYPE: %01
+SB: %18 %00xterm
+TTYPE: %00xterm
+SB: %18 %00
+TTYPE: %00
+SB: %18 %01xterm
+TTYPE: %01
