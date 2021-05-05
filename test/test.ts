@@ -90,7 +90,9 @@ export function reset(): void {
     }
   };
   t.onError = (_telnet: telnet_t<u8>, err: telnet_error_t, fatal: bool, desc: string): void => {
-    out += "ERR: %" + err.toString(16).toUpperCase().padStart(2, "0") + " fatal: " + fatal.toString() + " desc: " + desc;
+    out += "ERR: %" + err.toString(16).toUpperCase().padStart(2, "0");
+    if (fatal) out += " FATAL";
+    out += " -> " + desc + "\r\n";
   };
   t.onNegotiate = (_telnet: telnet_t<u8>, event_type: telnet_event_type_t, telopt: u8): void => {
     out += "NEGOTIATE: ";
