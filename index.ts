@@ -1108,13 +1108,17 @@ export class telnet_t<T> {
 	}
 
 	public send_subnegotation(telopt: u8, buffer: StaticArray<u8>): void {
-		this.onSend(this, [TELNET_IAC, TELNET_SB, telopt]);
-		this.send_buffer(buffer);
-		this.onSend(this, [TELNET_IAC, TELNET_SE]);
+		let onSend = this.onSend;
+		if (onSend) {
+			onSend(this, [TELNET_IAC, TELNET_SB, telopt]);
+			this.send_buffer(buffer);
+			onSend(this, [TELNET_IAC, TELNET_SE]);
+		}
 	}
 
 	public begin_sb(telopt: u8): void {
-		this.onSend(this, [TELNET_IAC, TELNET_SB, telopt]);
+		let onSend = this.onSend;
+		if (onSend) onSend(this, [TELNET_IAC, TELNET_SB, telopt]);
 	}
 
 	public begin_newenviron(cmd: u8): void {
@@ -1128,13 +1132,17 @@ export class telnet_t<T> {
 	}
 
 	public ttype_send(): void {
-		this.onSend(this, [TELNET_IAC, TELNET_SB, TELNET_TELOPT_TTYPE, TELNET_TTYPE_SEND, TELNET_IAC, TELNET_SE]);
+		let onSend = this.onSend;
+		if (onSend) onSend(this, [TELNET_IAC, TELNET_SB, TELNET_TELOPT_TTYPE, TELNET_TTYPE_SEND, TELNET_IAC, TELNET_SE]);
 	}
 
 	public ttype_is(ttype: string): void {
-		this.send_buffer([ TELNET_IAC, TELNET_SB, TELNET_TELOPT_TTYPE, TELNET_TTYPE_IS ]);
-		this.onSend(this, changetype<StaticArray<u8>>(String.UTF8.encode(ttype)));
-		this.finish_sb();
+		let onSend = this.onSend;
+		if (onSend) {
+			this.send_buffer([ TELNET_IAC, TELNET_SB, TELNET_TELOPT_TTYPE, TELNET_TTYPE_IS ]);
+			onSend(this, changetype<StaticArray<u8>>(String.UTF8.encode(ttype)));
+			this.finish_sb();
+		}
 	}
 
 	public finish_sb(): void {
