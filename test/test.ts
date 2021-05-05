@@ -1,4 +1,6 @@
 import {
+  TELNET_ENVIRON_USERVAR,
+  TELNET_ENVIRON_VAR,
   telnet_error_t,
   telnet_event_data_t,
   telnet_event_environ_t,
@@ -61,7 +63,21 @@ export function reset(): void {
     if (values) {
       for (let i = 0; i < values.length; i++) {
         let value = unchecked(values[i]);
-        out += "  " + value.key;
+        switch (value.env_type) {
+          case TELNET_ENVIRON_VAR: {
+            out += "  VAR";
+            break;
+          }
+          case TELNET_ENVIRON_USERVAR: {
+            out += "  USERVAR";
+            break;
+          }
+          default: {
+            out += "  INVALID";
+            break;
+          }
+        }
+        out += " " + value.key;
         let strValue = value.value;
         if (strValue) {
           out += " = " + strValue;
