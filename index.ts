@@ -601,7 +601,7 @@ export class telnet_t<T> {
 				}
 			}
 
-			values = new StaticArray<telnet_environ_t>(<i32>count);
+			ev.values = values = new StaticArray<telnet_environ_t>(<i32>count);
 
 			/* parse argument array strings */
 			// i indexes the buffer
