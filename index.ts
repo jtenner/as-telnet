@@ -6,6 +6,18 @@ export class telnet_event_t {
 	) {}
 }
 
+export class telnet_event_zmp_t extends telnet_event_t {
+	public constructor(
+		public argv: string[],
+	) {
+		super(telnet_event_type_t.TELNET_EV_ZMP);
+	}
+
+	public get argc(): i32 {
+		return this.argv.length;
+	}
+}
+
 export class telnet_environ_t {
 	public constructor(
 		/*!< either TELNET_ENVIRON_VAR or TELNET_ENVIRON_USERVAR */
@@ -322,6 +334,9 @@ export class telnet_t<T> {
 	/** iac callback */
 	onIAC: ((telnet: telnet_t<T>, ev: telnet_event_iac_t) => void) | null;
 
+	/** zmp callback */
+	onZMP: ((telnet: telnet_t<T>, ev: telnet_event_zmp_t) => void) | null;
+
 	private set_rfc1143(telopt: u8, us: u8, him: u8): void {
 		unchecked(this.q[telopt] = Q_MAKE(us,him));
 
@@ -494,6 +509,37 @@ export class telnet_t<T> {
 			}
 	}
 
+	/* parse ZMP command subnegotiation buffers */
+	private zmp_telnet(buffer: StaticArray<u8>, size: i32): i32 {
+		let argv: string[] = [];
+
+		/* make sure this is a valid ZMP buffer */
+		if (size == 0 || buffer[size - 1] != 0) {
+			let onError = this.onError;
+			if (onError) onError(this, telnet_error_t.TELNET_EPROTOCOL, false, "incomplete ZMP frame");
+			return 0;
+		}
+
+		let start = 0;
+		for (let i = 0; i < size; i++) {
+			if (unchecked(buffer[i] == 0)) {
+				let str = String.UTF8.decodeUnsafe(
+					changetype<usize>(buffer) + <usize>start,
+					<usize>(i - start + 1),
+					true,
+				);
+				argv.push(str);
+				start = i + 1;
+			}
+		}
+
+		let ev = new telnet_event_zmp_t(argv);
+		let onZMP = this.onZMP;
+		if (onZMP) onZMP(this, ev);
+
+		return 0;
+	}
+
 	private environ_telnet(environType: u8, buffer: StaticArray<u8>, size: i32): i32 {
 			let ev: telnet_event_environ_t;
 			let values: StaticArray<telnet_environ_t>;
@@ -612,7 +658,8 @@ export class telnet_t<T> {
 
 		/* first byte must be a VAR */
 		if (unchecked(buffer[0]) != TELNET_MSSP_VAR) {
-			this.onError(this, telnet_error_t.TELNET_EPROTOCOL, false, "MSSP subnegotiation has invalid data");
+			let onError = this.onError;
+			if (onError) onError(this, telnet_error_t.TELNET_EPROTOCOL, false, "MSSP subnegotiation has invalid data");
 			return 0;
 		}
 
@@ -644,12 +691,14 @@ export class telnet_t<T> {
 				unchecked(values[index]).value = str;
 				index++;
 			} else {
-				this.onError(this, telnet_error_t.TELNET_EPROTOCOL, false, "invalid MSSP subnegotiation data");
+				let onError = this.onError;
+				if (onError) onError(this, telnet_error_t.TELNET_EPROTOCOL, false, "invalid MSSP subnegotiation data");
 				return 0;
 			}
 		}
 
-		this.onMSSP(this, ev);
+		let onMSSP = this.onMSSP;
+		if (onMSSP) onMSSP(this, ev);
 		return 0;
 	}
 
@@ -657,14 +706,16 @@ export class telnet_t<T> {
 	private ttype_telnet(buffer: StaticArray<u8>, size: i32): i32 {
 		/* make sure request is not empty */
 		if (size == 0) {
-			this.onError(this, telnet_error_t.TELNET_EPROTOCOL, false, "incomplete TERMINAL-TYPE request");
+			let onError = this.onError;
+			if (onError) onError(this, telnet_error_t.TELNET_EPROTOCOL, false, "incomplete TERMINAL-TYPE request");
 			return 0;
 		}
 		let c = unchecked(buffer[0]);
 		/* make sure request has valid command type */
 		if (c != TELNET_TTYPE_IS &&
 				c != TELNET_TTYPE_SEND) {
-			this.onError(this, telnet_error_t.TELNET_EPROTOCOL, false, "TERMINAL-TYPE request has invalid type");
+			let onError = this.onError;
+			if (onError) onError(this, telnet_error_t.TELNET_EPROTOCOL, false, "TERMINAL-TYPE request has invalid type");
 			return 0;
 		}
 
@@ -685,20 +736,22 @@ export class telnet_t<T> {
 				null,
 			);
 		}
-		this.onTTYPE(this, ev);
+		let onTTYPE = this.onTTYPE;
+		if (onTTYPE) onTTYPE(this, ev);
 		return 0;
 	}
 
 	private subnegotiate(): i32 {
 		let ev: telnet_event_sb_t = new telnet_event_sb_t(
 			this.sb_telopt,
-			this.buffer,
+			StaticArray.slice(this.buffer, 0, this.buffer_pos),
 		);
-		this.onSubnegotiate(this, ev);
+		let onSubnegotiate = this.onSubnegotiate;
+		if (onSubnegotiate) onSubnegotiate(this, ev);
 
 		switch (this.sb_telopt) {
-			// case TELNET_TELOPT_ZMP:
-			// 	return this.zmp_telnet(this.buffer);
+			case TELNET_TELOPT_ZMP:
+			 	return this.zmp_telnet(this.buffer, this.buffer_pos);
 			case TELNET_TELOPT_TTYPE:
 				return this.ttype_telnet(this.buffer, this.buffer_pos);
 			case TELNET_TELOPT_ENVIRON:
@@ -752,7 +805,7 @@ export class telnet_t<T> {
 						if (onData) onData(this, ev);
 					}
 					this.state = telnet_state_t.TELNET_STATE_IAC;
-				} else if (byte == <u8>'\r'.charCodeAt(0) &&
+				} else if (byte == <u8>('\r'.charCodeAt(0)) &&
 							 (this.flags & TELNET_FLAG_NVT_EOL) &&
 							 !(this.flags & TELNET_FLAG_RECEIVE_BINARY)) {
 					if (i != start) {
@@ -806,7 +859,8 @@ export class telnet_t<T> {
 				case TELNET_IAC: {
 					/* event */
 					let ev = new telnet_event_data_t([byte]);
-					this.onData(this, ev);
+					let onData = this.onData;
+					if (onData) onData(this, ev);
 
 					/* state update */
 					start = i + 1;
@@ -817,7 +871,8 @@ export class telnet_t<T> {
 				default: {
 					/* event */
 					let ev = new telnet_event_iac_t(byte);
-					this.onIAC(this, ev);
+					let onIAC = this.onIAC;
+					if (onIAC) onIAC(this, ev);
 
 					/* state update */
 					start = i + 1;
@@ -873,7 +928,7 @@ export class telnet_t<T> {
 					/* return to default state */
 					start = i + 1;
 					this.state = telnet_state_t.TELNET_STATE_DATA;
-	
+
 					/* process subnegotiation */
 					if (this.subnegotiate() != 0) {
 						/* any remaining bytes in the buffer are compressed.
@@ -901,7 +956,8 @@ export class telnet_t<T> {
 				 * given command as an IAC code.
 				 */
 				default:
-					this.onError(this, telnet_error_t.TELNET_EPROTOCOL, false,
+					let onError = this.onError;
+					if (onError) onError(this, telnet_error_t.TELNET_EPROTOCOL, false,
 						"unexpected byte after IAC inside SB: " + byte.toString()
 					);
 
@@ -930,7 +986,8 @@ export class telnet_t<T> {
 		/* pass through any remaining bytes */
 		if (this.state == telnet_state_t.TELNET_STATE_DATA && i != start) {
 			let ev = new telnet_event_data_t(StaticArray.slice(buffer, start, i - start));
-			this.onData(this, ev);
+			let onData = this.onData;
+			if (onData) onData(this, ev);
 		}
 	}
 
@@ -939,12 +996,14 @@ export class telnet_t<T> {
 	}
 
 	public iac(cmd: u8): void {
-		this.onSend(this, [TELNET_IAC, cmd]);
+		let onSend = this.onSend;
+		if (onSend) onSend(this, [TELNET_IAC, cmd]);
 	}
 
 	public negotiate(cmd: u8, telopt: u8): void {
 		if (this.flags & TELNET_FLAG_PROXY) {
-			this.onSend(this, [TELNET_IAC, cmd, telopt]);
+			let onSend = this.onSend;
+			if (onSend) onSend(this, [TELNET_IAC, cmd, telopt]);
 			return;
 		}
 

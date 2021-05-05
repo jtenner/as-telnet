@@ -32,12 +32,14 @@ loader.instantiate(fs.readFileSync("./build/untouched.wasm"), {}).then(e => {
       }
       let array = e.exports.__newArray(e.exports.get_array_type(), buffer);
       e.exports.__pin(array);
-      let strPtr = e.exports.input_bytes(array);
+      e.exports.input_bytes(array);
       e.exports.__unpin(array);
-      output = e.exports.__getString(strPtr);
     });
 
+    output = e.exports.__getString(e.exports.get_output());
+
     if (createSnap) {
+      console.log(output);
       fs.writeFileSync(snapfile, output);
     } else {
       const snapfileContents = fs.readFileSync(snapfile, "utf8");

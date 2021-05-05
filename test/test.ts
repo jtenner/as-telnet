@@ -7,6 +7,7 @@ import {
   telnet_event_sb_t,
   telnet_event_ttype_t,
   telnet_event_type_t,
+  telnet_event_zmp_t,
   telnet_t,
   TELNET_TELOPT_BINARY,
   TELNET_TELOPT_COMPRESS,
@@ -19,9 +20,10 @@ let out = "";
 
 function bytesOut<T>(bytes: T): void {
   // @ts-ignore: length will be defined
-  for (let i = 0; i < bytes.length; i++) {
+  let length = bytes.length;
+  for (let i = 0; i < length; i++) {
     // @ts-ignore: accessor will be defined
-    let e = bytes[i];
+    let e = unchecked(bytes[i]);
     out += (e >= 33 && e <= 126) || e == 0x20
       ? String.fromCharCode(<u16>e)
       : "%" + e.toString(16).toUpperCase().padStart(2, "0");
@@ -35,6 +37,10 @@ compatibility[TELNET_TELOPT_NEW_ENVIRON] = 0b10;
 compatibility[TELNET_TELOPT_TTYPE] = 0b10;
 
 let t = new telnet_t<u8>(0, compatibility, 0);
+
+export function get_output(): string {
+  return out;
+}
 
 export function reset(): void {
   out = "";
@@ -65,7 +71,7 @@ export function reset(): void {
     }
   };
   t.onIAC = (_telnet: telnet_t<u8>, ev: telnet_event_iac_t): void => {
-    out += "IAC: %" + ev.cmd.toString(16).toUpperCase().padStart(2, "0");
+    out += "IAC: %" + ev.cmd.toString(16).toUpperCase().padStart(2, "0") + "\r\n";
   };
   t.onMSSP = (_telnet: telnet_t<u8>, ev: telnet_event_mssp_t): void => {
     out += "MSSP: %" + ev.type.toString(16).toUpperCase().padStart(2, "0") + "\r\n";
@@ -123,14 +129,22 @@ export function reset(): void {
     }
     out += "\r\n";
   };
+  t.onZMP = (_telnet: telnet_t<u8>, ev: telnet_event_zmp_t): void => {
+    out += "ZMP:\r\n";
+    let argv = ev.argv;
+    let argc = ev.argc;
+    for (let i = 0; i < argc; i++) {
+      let arg = unchecked(argv[i]);
+      out += "  " + arg + "\r\n";
+    }
+  };
 }
 export function get_array_type(): u32 {
   return idof<StaticArray<u8>>();
 }
 
-export function input_bytes(buffer: StaticArray<u8>): string {
+export function input_bytes(buffer: StaticArray<u8>): void {
   t.recv(buffer);
-  return out;
 };
 
 /*
