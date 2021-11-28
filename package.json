@@ -14,13 +14,13 @@
   "author": "Joshua Tenner <tenner.joshua@gmail.com>",
   "license": "MIT",
   "devDependencies": {
-    "@as-pect/cli": "^6.1.0",
-    "as-wasi": "^0.4.4",
-    "assemblyscript": "^0.18.30",
+    "@as-pect/cli": "^6.2.4",
+    "as-wasi": "^0.4.6",
+    "assemblyscript": "^0.19.20",
     "diff": "^5.0.0",
-    "glob": "^7.1.6"
+    "glob": "^7.2.0"
   },
   "dependencies": {
-    "@assemblyscript/loader": "^0.18.30"
+    "@assemblyscript/loader": "^0.19.20"
   }
 }
