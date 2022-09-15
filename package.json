@@ -1,9 +1,9 @@
 {
   "name": "as-telnet",
-  "ascMain": "index.ts",
   "version": "0.0.1",
   "description": "Telnet implemented for AssemblyScript",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "asbuild:test": "asc --target debug test/test.ts",
     "run:test": "node test/index.js",
@@ -14,13 +14,11 @@
   "author": "Joshua Tenner <tenner.joshua@gmail.com>",
   "license": "MIT",
   "devDependencies": {
-    "@as-pect/cli": "^6.2.4",
-    "as-wasi": "^0.4.6",
-    "assemblyscript": "^0.19.20",
-    "diff": "^5.0.0",
-    "glob": "^7.2.0"
+    "assemblyscript": "^0.21.3",
+    "diff": "^5.1.0",
+    "glob": "^8.0.3"
   },
   "dependencies": {
-    "@assemblyscript/loader": "^0.19.20"
+    "@assemblyscript/loader": "^0.21.3"
   }
 }

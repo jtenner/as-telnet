@@ -1,8 +1,8 @@
-const glob = require("glob");
-const fs = require("fs");
-const path = require("path");
-const diff = require("diff");
-const loader = require("@assemblyscript/loader");
+import glob from "glob";
+import fs from "fs";
+import path from "path";
+import * as diff from "diff";
+import loader from "@assemblyscript/loader";
 const inputFiles = glob.sync("test/*.input");
 const createSnap = process.argv.includes("--create");
 
